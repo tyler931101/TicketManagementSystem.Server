@@ -1,0 +1,7 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0
+MinimumVisualStudioVersion = 10.0.0
+
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TicketManagementSystem.Server", "TicketManagementSystem.Server\TicketManagementSystem.Server.csproj", "{9A19103F-16F7-4668-BE54-9A1E7A4F7556}"
+EndProject

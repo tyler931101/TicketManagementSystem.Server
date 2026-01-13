@@ -1,0 +1,99 @@
+# Build results
+[Dd]ebug/
+[Dd]ebug*/
+[Rr]elease/
+[Rr]elease*/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Bb]in*/
+[Oo]bj/
+[Oo]bj*/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# NuGet packages
+*.nupkg
+**/packages/*
+!**/packages/build/
+!**/packages/repositories.config
+
+# Visual Studio cache files
+.vs/
+*.cache
+*.ilk
+*.log
+*.tlog
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp_proj
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# Code analysis
+*.CodeAnalysisLog.xml
+StyleCopReport.xml
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# TeamCity
+_TeamCity*
+
+# DotCover
+*.dotCover
+
+# NCrunch
+_NCrunch_*
+.*crunch*.local.xml
+
+# MightyMoose
+*.mm.*
+AutoTest.Net/
+
+# Web workloads
+node_modules/
+bower_components/
+
+# Publish
+publish/
+PublishProfiles/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Rider
+.idea/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# ASP.NET Core specific
+appsettings.Development.json
+appsettings.Local.json
+*.Development.usersecrets
