@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
@@ -15,43 +17,54 @@ namespace TicketManagementSystem.Server.Services
             _db = db;
         }
 
-        public IEnumerable<Ticket> GetAll()
+        public async Task<IEnumerable<Ticket>> GetAllAsync()
         {
-            return _db.Tickets
+            return await _db.Tickets
                 .Include(t => t.AssignedUser)
                 .OrderByDescending(t => t.CreatedAt)
-                .ToList();
+                .ToListAsync();
         }
 
-        public IEnumerable<Ticket> GetByUser(string username)
+        public async Task<IEnumerable<Ticket>> GetByUserAsync(string username)
         {
-            return _db.Tickets
+            return await _db.Tickets
                 .Include(t => t.AssignedUser)
                 .Where(t => t.AssignedUser != null && t.AssignedUser.Username == username)
                 .OrderByDescending(t => t.CreatedAt)
-                .ToList();
+                .ToListAsync();
         }
 
-        public void Add(Ticket ticket)
+        public async Task<Ticket> AddAsync(Ticket ticket)
         {
             _db.Tickets.Add(ticket);
-            _db.SaveChanges();
+            await _db.SaveChangesAsync();
+            return ticket;
         }
 
-        public void Update(Ticket ticket)
+        public async Task<bool> UpdateAsync(Ticket ticket)
         {
-            _db.Tickets.Update(ticket);
-            _db.SaveChanges();
+            var existing = await _db.Tickets.FindAsync(ticket.Id);
+            if (existing == null)
+                return false;
+
+            _db.Entry(existing).CurrentValues.SetValues(ticket);
+            await _db.SaveChangesAsync();
+            return true;
         }
 
-        public void Delete(int id)
+        public async Task<bool> DeleteAsync(string id)
         {
-            var existing = _db.Tickets.Find(id);
+            if (!Guid.TryParse(id, out var ticketId))
+                return false;
+
+            var existing = await _db.Tickets.FindAsync(ticketId);
             if (existing != null)
             {
                 _db.Tickets.Remove(existing);
-                _db.SaveChanges();
+                await _db.SaveChangesAsync();
+                return true;
             }
+            return false;
         }
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Services;
+using TicketManagementSystem.Server.DTOs.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,21 @@ builder.Services.AddDbContext<AppDbContext>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<TicketService>();
 builder.Services.AddScoped<AuthenticationService>();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .SelectMany(x => x.Value!.Errors)
+                .Select(x => x.ErrorMessage)
+                .ToList();
+            
+            return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(
+                ApiResponse<object>.ErrorResult("Validation failed", errors));
+        };
+    });
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>

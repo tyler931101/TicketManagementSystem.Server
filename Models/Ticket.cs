@@ -6,7 +6,7 @@ namespace TicketManagementSystem.Server.Models
     public class Ticket
     {
         [Key]
-        public int Id { get; set; }
+        public Guid Id { get; set; } = Guid.NewGuid();
 
         [Required]
         public string Title { get; set; } = string.Empty;
@@ -19,7 +19,7 @@ namespace TicketManagementSystem.Server.Models
         [Required]
         public DateTime DueDate { get; set; }
 
-        public int? AssignedUserId { get; set; }
+        public Guid? AssignedUserId { get; set; } = Guid.NewGuid();
 
         [ForeignKey(nameof(AssignedUserId))]
         public User? AssignedUser { get; set; }

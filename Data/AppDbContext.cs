@@ -8,15 +8,8 @@ namespace TicketManagementSystem.Server.Data
         public DbSet<User> Users { get; set; }
         public DbSet<Ticket> Tickets { get; set; }
 
-        private static bool _created = false;
-
         public AppDbContext()
         {
-            if (!_created)
-            {
-                _created = true;
-                Database.EnsureCreated();
-            }
         }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -27,6 +20,13 @@ namespace TicketManagementSystem.Server.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            
+            // Configure Ticket-User relationship
+            modelBuilder.Entity<Ticket>()
+                .HasOne(t => t.AssignedUser)
+                .WithMany()
+                .HasForeignKey(t => t.AssignedUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

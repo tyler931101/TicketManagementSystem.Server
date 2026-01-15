@@ -3,6 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
 using TicketManagementSystem.Server.Services;
+using TicketManagementSystem.Server.DTOs.Auth;
+using TicketManagementSystem.Server.DTOs.Common;
+using TicketManagementSystem.Server.DTOs.Users;
 
 namespace TicketManagementSystem.Server.Controllers
 {
@@ -18,68 +21,77 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest request)
+        public IActionResult Login([FromBody] DTOs.Auth.LoginRequest request)
         {
             try
             {
-                var user = _authService.Login(request.Email, request.Password);
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Invalid request data"));
+                }
+
+                var user = _authService.LoginAsync(request.Email, request.Password);
+
                 if (user == null)
                 {
-                    return Unauthorized(new { message = "Invalid credentials" });
+                    return Unauthorized(ApiResponse<object>.ErrorResult("Invalid credentials"));
                 }
 
                 if (!user.IsLoginAllowed)
                 {
-                    return BadRequest(new { message = "Login not allowed for this user" });
+                    return BadRequest(ApiResponse<object>.ErrorResult("Login not allowed for this user"));
                 }
 
-                return Ok(new { 
-                    user = new 
-                    {
-                        user.Id,
-                        user.Username,
-                        user.Email,
-                        user.Role,
-                        user.IsLoginAllowed
-                    }
-                });
+                var userDto = new DTOs.Auth.UserDto
+                {
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email,
+                    Role = user.Role,
+                    AvatarPath = user.AvatarPath,
+                    IsLoginAllowed = user.IsLoginAllowed,
+                    CreatedAt = user.CreatedAt,
+                    UpdatedAt = user.UpdatedAt
+                };
+
+                var authResponse = new DTOs.Auth.AuthResponse
+                {
+                    User = userDto,
+                    Token = "", // TODO: Implement JWT token generation
+                    ExpiresAt = DateTime.Now.AddHours(24)
+                };
+
+                return Ok(ApiResponse<DTOs.Auth.AuthResponse>.SuccessResult(authResponse, "Login successful"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        public IActionResult Register([FromBody] DTOs.Auth.RegisterRequest request)
         {
             try
             {
-                var success = _authService.Register(request.Username, request.Password, request.Email);
-                if (!success)
+                if (!ModelState.IsValid)
                 {
-                    return BadRequest(new { message = "Registration failed - username or email already exists" });
+                    return BadRequest(ApiResponse<object>.ErrorResult("Invalid request data"));
                 }
 
-                return Ok(new { message = "User registered successfully" });
+                var success = _authService.RegisterAsync(request.Username, request.Password, request.Email);
+                if (!success)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Registration failed - username or email already exists"));
+                }
+
+                return Ok(ApiResponse<object>.SuccessResult(new { }, "User registered successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                // Handle exceptions from AuthService (database errors, etc.)
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Registration failed due to server error", new List<string> { ex.Message }));
             }
         }
-    }
-
-    public class LoginRequest
-    {
-        public string Email { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-    }
-
-    public class RegisterRequest
-    {
-        public string Username { get; set; } = string.Empty;
-        public string Password { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
     }
 }

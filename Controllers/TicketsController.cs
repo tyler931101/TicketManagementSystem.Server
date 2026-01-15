@@ -17,11 +17,11 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
             try
             {
-                var tickets = _ticketService.GetAll();
+                var tickets = await _ticketService.GetAllAsync();
                 return Ok(tickets.Select(t => new 
                 { 
                     t.Id, 
@@ -46,11 +46,11 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpGet("user/{username}")]
-        public IActionResult GetByUser(string username)
+        public async Task<IActionResult> GetByUser(string username)
         {
             try
             {
-                var tickets = _ticketService.GetByUser(username);
+                var tickets = await _ticketService.GetByUserAsync(username);
                 return Ok(tickets.Select(t => new 
                 { 
                     t.Id, 
@@ -75,7 +75,7 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPost]
-        public IActionResult Create([FromBody] CreateTicketRequest request)
+        public async Task<IActionResult> Create([FromBody] CreateTicketRequest request)
         {
             try
             {
@@ -88,7 +88,7 @@ namespace TicketManagementSystem.Server.Controllers
                     AssignedUserId = request.AssignedUserId
                 };
 
-                _ticketService.Add(ticket);
+                await _ticketService.AddAsync(ticket);
                 return Ok(new { message = "Ticket created successfully", ticketId = ticket.Id });
             }
             catch (Exception ex)
@@ -98,13 +98,13 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPut("{id}")]
-        public IActionResult Update(int id, [FromBody] UpdateTicketRequest request)
+        public async Task<IActionResult> Update(string id, [FromBody] UpdateTicketRequest request)
         {
             try
             {
                 var ticket = new Ticket
                 {
-                    Id = id,
+                    Id = Guid.Parse(id),
                     Title = request.Title,
                     Description = request.Description,
                     Status = request.Status,
@@ -113,7 +113,11 @@ namespace TicketManagementSystem.Server.Controllers
                     UpdatedAt = DateTime.Now
                 };
 
-                _ticketService.Update(ticket);
+                var success = await _ticketService.UpdateAsync(ticket);
+                if (!success)
+                {
+                    return NotFound(new { message = "Ticket not found" });
+                }
                 return Ok(new { message = "Ticket updated successfully" });
             }
             catch (Exception ex)
@@ -123,11 +127,15 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(string id)
         {
             try
             {
-                _ticketService.Delete(id);
+                var success = await _ticketService.DeleteAsync(id);
+                if (!success)
+                {
+                    return NotFound(new { message = "Ticket not found" });
+                }
                 return Ok(new { message = "Ticket deleted successfully" });
             }
             catch (Exception ex)
@@ -143,7 +151,7 @@ namespace TicketManagementSystem.Server.Controllers
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = "To Do";
         public DateTime DueDate { get; set; }
-        public int? AssignedUserId { get; set; }
+        public Guid? AssignedUserId { get; set; }
     }
 
     public class UpdateTicketRequest
@@ -152,6 +160,6 @@ namespace TicketManagementSystem.Server.Controllers
         public string Description { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public DateTime DueDate { get; set; }
-        public int? AssignedUserId { get; set; }
+        public Guid? AssignedUserId { get; set; }
     }
 }

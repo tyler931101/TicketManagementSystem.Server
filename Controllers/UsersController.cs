@@ -38,7 +38,7 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPost("{id}/toggle-login")]
-        public IActionResult ToggleLogin(int id, [FromBody] ToggleLoginRequest request)
+        public IActionResult ToggleLogin(Guid id, [FromBody] ToggleLoginRequest request)
         {
             try
             {
