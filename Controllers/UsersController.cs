@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
 using TicketManagementSystem.Server.Services;
+using TicketManagementSystem.Server.DTOs.Users;
+using TicketManagementSystem.Server.DTOs.Common;
 
 namespace TicketManagementSystem.Server.Controllers
 {
@@ -17,23 +19,71 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpGet]
-        public IActionResult GetAll()
+        [ResponseCache(Duration = 30)] // Cache for 30 seconds
+        public IActionResult GetAllUsers([FromQuery] PagedRequestDto request)
         {
             try
             {
-                var users = _userService.GetAll();
-                return Ok(users.Select(u => new 
-                { 
-                    u.Id, 
-                    u.Username, 
-                    u.Email, 
-                    u.Role, 
-                    u.IsLoginAllowed 
-                }));
+                // Validate request
+                if (request.PageSize > 100)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Page size cannot exceed 100", 
+                        new List<string> { "Maximum page size is 100" }));
+                }
+
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                var result = _userService.GetAllUsersAsync(request);
+                stopwatch.Stop();
+
+                // Add performance metadata
+                Response.Headers.Add("X-Response-Time", stopwatch.ElapsedMilliseconds.ToString());
+                Response.Headers.Add("X-Total-Records", result.TotalRecords.ToString());
+
+                return Ok(ApiResponse<PagedResponseDto<User>>.SuccessResult(result, "Users retrieved successfully"));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Invalid request parameters", 
+                    new List<string> { ex.Message }));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                // Log the exception for monitoring
+                Console.WriteLine($"Error retrieving users: {ex}");
+                return StatusCode(500, ApiResponse<object>.ErrorResult("An error occurred while retrieving users", 
+                    new List<string> { "Internal server error" }));
+            }
+        }
+
+        [HttpGet("ticket-users")]
+        public IActionResult GetTicketUsers()
+        {
+            try
+            {
+                var users = _userService.GetTicketUsersAsync();
+                
+                if (users == null)
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Unable to retrieve users from service"));
+                }
+                
+                var ticketUsers = users.Select(u => new TicketUserDto
+                {
+                    Id = u.Id,
+                    Username = u.Username
+                }).ToList();
+                
+                return Ok(ApiResponse<List<TicketUserDto>>.SuccessResult(ticketUsers, "Ticket users retrieved successfully"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Invalid operation: " + ex.Message));
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (in production, you'd use proper logging)
+                Console.WriteLine($"Error in GetTicketUsers: {ex.Message}");
+                return StatusCode(500, ApiResponse<object>.ErrorResult("An unexpected error occurred while retrieving ticket users"));
             }
         }
 

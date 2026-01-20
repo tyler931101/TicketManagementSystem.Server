@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Mvc;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
 using TicketManagementSystem.Server.Services;
+using TicketManagementSystem.Server.DTOs.Auth;
+using TicketManagementSystem.Server.DTOs.Common;
+using TicketManagementSystem.Server.DTOs.Users;
+using TicketManagementSystem.Server.DTOs.Tickets;
 
 namespace TicketManagementSystem.Server.Controllers
 {
@@ -22,26 +26,35 @@ namespace TicketManagementSystem.Server.Controllers
             try
             {
                 var tickets = await _ticketService.GetAllAsync();
-                return Ok(tickets.Select(t => new 
+                var ticketDtos = tickets.Select(t => new TicketDto
                 { 
-                    t.Id, 
-                    t.Title, 
-                    t.Description, 
-                    t.Status, 
-                    t.DueDate, 
-                    t.CreatedAt, 
-                    t.UpdatedAt,
-                    AssignedUserId = t.AssignedUserId,
-                    AssignedUser = t.AssignedUser == null ? null : new 
+                    Id = t.Id,
+                    Title = t.Title,
+                    Description = t.Description,
+                    Status = t.Status,
+                    DueDate = t.DueDate,
+                    Priority = "Medium", // Default priority since model doesn't have it
+                    CreatedAt = t.CreatedAt,
+                    UpdatedAt = t.UpdatedAt,
+                    AssignedUserId = t.AssignedUserId?.ToString(),
+                    AssignedUser = t.AssignedUser == null ? null : new DTOs.Users.UserDto
                     { 
-                        t.AssignedUser.Id, 
-                        t.AssignedUser.Username 
+                        Id = t.AssignedUser.Id,
+                        Username = t.AssignedUser.Username,
+                        Email = t.AssignedUser.Email,
+                        Role = t.AssignedUser.Role,
+                        AvatarPath = t.AssignedUser.AvatarPath,
+                        IsLoginAllowed = t.AssignedUser.IsLoginAllowed,
+                        CreatedAt = t.AssignedUser.CreatedAt,
+                        UpdatedAt = t.AssignedUser.UpdatedAt
                     }
-                }));
+                }).ToList();
+                
+                return Ok(ApiResponse<List<TicketDto>>.SuccessResult(ticketDtos, "Tickets retrieved successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<List<TicketDto>>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
 
@@ -89,11 +102,11 @@ namespace TicketManagementSystem.Server.Controllers
                 };
 
                 await _ticketService.AddAsync(ticket);
-                return Ok(new { message = "Ticket created successfully", ticketId = ticket.Id });
+                return Ok(ApiResponse<object>.SuccessResult(new { }, "Ticket created successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
 
