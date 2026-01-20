@@ -96,7 +96,7 @@ namespace TicketManagementSystem.Server.DTOs.Tickets
     // Custom validation attribute for future dates
     public class FutureDateAttribute : ValidationAttribute
     {
-        protected override ValidationResult IsValid(object? value, ValidationContext validationContext)
+        protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
             if (value is DateTime dateTime)
             {

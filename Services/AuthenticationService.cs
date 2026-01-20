@@ -1,4 +1,9 @@
-using System.Linq;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
 
@@ -7,98 +12,108 @@ namespace TicketManagementSystem.Server.Services
     public class AuthenticationService
     {
         private readonly AppDbContext _db;
+        private readonly IConfiguration _configuration;
 
-        public AuthenticationService(AppDbContext db)
+        public AuthenticationService(AppDbContext db, IConfiguration configuration)
         {
             _db = db;
+            _configuration = configuration;
         }
 
-        public User? LoginAsync(string email, string password)
+        public async Task<(User? User, string? Token)> LoginAsync(string email, string password)
         {
-            var user = _db.Users.FirstOrDefault(u => u.Email == email);
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
 
             if (user == null)
-                return null;
+                return (null, null);
 
-            if (user.Password != password)
-                return null;
+            // Verify password hash
+            // Fallback for existing plain text passwords (for migration purposes if needed, but better to enforce hash)
+            // Ideally we should re-hash if it was plain text, but for now assuming all new users are hashed.
+            // If the password length is < 60, it's likely plain text (BCrypt hash is 60 chars).
+            bool isValid = false;
+            if (user.Password.Length < 60)
+            {
+                // Legacy plain text check
+                isValid = user.Password == password;
+                if (isValid)
+                {
+                    // Upgrade to hash
+                    user.Password = BCrypt.Net.BCrypt.HashPassword(password);
+                    await _db.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                isValid = BCrypt.Net.BCrypt.Verify(password, user.Password);
+            }
+
+            if (!isValid)
+                return (null, null);
 
             if (!user.IsLoginAllowed)
-                return null;
+                return (user, null);
 
-            return user;
+            var token = GenerateJwtToken(user);
+            return (user, token);
         }
 
-        public bool RegisterAsync(string username, string password, string email)
+        public async Task<bool> RegisterAsync(string username, string password, string email)
         {
             try
             {
-                Console.WriteLine($"=== Registration Attempt ===");
-                Console.WriteLine($"Username: {username}");
-                Console.WriteLine($"Email: {email}");
-                
                 // Ensure database is created
-                Console.WriteLine("Creating database if not exists...");
-                _db.Database.EnsureCreated();
-                Console.WriteLine("Database created/verified");
-                
-                // Check existing users
-                Console.WriteLine("Checking for existing users...");
-                var existingUsers = _db.Users.ToList();
-                Console.WriteLine($"Total existing users: {existingUsers.Count}");
-                
-                foreach (var user in existingUsers)
+                await _db.Database.EnsureCreatedAsync();
+
+                if (await _db.Users.AnyAsync(u => u.Username == username || u.Email == email))
                 {
-                    Console.WriteLine($"User: {user.Username}, Email: {user.Email}");
+                    return false;
                 }
 
-                if (_db.Users.Any(u => u.Username == username))
-                {
-                    Console.WriteLine($"ERROR: Username '{username}' already exists");
-                    return false; // This is the expected false for duplicate
-                }
-
-                if (_db.Users.Any(u => u.Email == email))
-                {
-                    Console.WriteLine($"ERROR: Email '{email}' already exists");
-                    return false; // This is the expected false for duplicate
-                }
-
-                bool isFirstUser = !_db.Users.Any();
-                Console.WriteLine($"Is first user: {isFirstUser}");
+                bool isFirstUser = !await _db.Users.AnyAsync();
 
                 var newUser = new User
                 {
                     Username = username,
-                    Password = password,
+                    Password = BCrypt.Net.BCrypt.HashPassword(password),
                     Email = email,
                     Role = isFirstUser ? "Admin" : "User",
                     IsLoginAllowed = true
                 };
 
-                Console.WriteLine("Adding new user to database...");
                 _db.Users.Add(newUser);
+                await _db.SaveChangesAsync();
                 
-                Console.WriteLine("Saving changes...");
-                _db.SaveChanges();
-                
-                Console.WriteLine($"User '{username}' registered successfully");
-                Console.WriteLine("=== Registration Complete ===");
                 return true;
             }
             catch (Exception ex)
             {
-                // Log the actual error for debugging
-                Console.WriteLine($"=== Registration Error ===");
-                Console.WriteLine($"Error: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                Console.WriteLine($"Inner exception: {ex.InnerException?.Message}");
-                Console.WriteLine("=== End Error ===");
-                
-                // Re-throw the exception so the controller can handle it properly
-                // This distinguishes between duplicate errors (return false) and other errors (throw exception)
-                throw new Exception($"Registration failed: {ex.Message}", ex);
+                // Log error
+                Console.WriteLine($"Registration error: {ex.Message}");
+                throw;
             }
+        }
+
+        private string GenerateJwtToken(User user)
+        {
+            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing"));
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(new[]
+                {
+                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                    new Claim(ClaimTypes.Name, user.Username),
+                    new Claim(ClaimTypes.Email, user.Email),
+                    new Claim(ClaimTypes.Role, user.Role)
+                }),
+                Expires = DateTime.UtcNow.AddDays(double.Parse(_configuration["Jwt:ExpireDays"] ?? "7")),
+                Issuer = _configuration["Jwt:Issuer"],
+                Audience = _configuration["Jwt:Audience"],
+                SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            };
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
         }
     }
 }

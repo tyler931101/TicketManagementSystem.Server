@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
@@ -9,6 +10,7 @@ using TicketManagementSystem.Server.DTOs.Tickets;
 
 namespace TicketManagementSystem.Server.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class TicketsController : ControllerBase
@@ -64,26 +66,31 @@ namespace TicketManagementSystem.Server.Controllers
             try
             {
                 var tickets = await _ticketService.GetByUserAsync(username);
-                return Ok(tickets.Select(t => new 
+                var ticketDtos = tickets.Select(t => new TicketDto
                 { 
-                    t.Id, 
-                    t.Title, 
-                    t.Description, 
-                    t.Status, 
-                    t.DueDate, 
-                    t.CreatedAt, 
-                    t.UpdatedAt,
-                    AssignedUserId = t.AssignedUserId,
-                    AssignedUser = t.AssignedUser == null ? null : new 
+                    Id = t.Id, 
+                    Title = t.Title, 
+                    Description = t.Description, 
+                    Status = t.Status, 
+                    DueDate = t.DueDate,
+                    Priority = "Medium",
+                    CreatedAt = t.CreatedAt, 
+                    UpdatedAt = t.UpdatedAt,
+                    AssignedUserId = t.AssignedUserId?.ToString(),
+                    AssignedUser = t.AssignedUser == null ? null : new DTOs.Users.UserDto
                     { 
-                        t.AssignedUser.Id, 
-                        t.AssignedUser.Username 
+                        Id = t.AssignedUser.Id, 
+                        Username = t.AssignedUser.Username,
+                        Email = t.AssignedUser.Email,
+                        Role = t.AssignedUser.Role
                     }
-                }));
+                }).ToList();
+
+                return Ok(ApiResponse<List<TicketDto>>.SuccessResult(ticketDtos, "User tickets retrieved successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<List<TicketDto>>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
 
@@ -129,13 +136,13 @@ namespace TicketManagementSystem.Server.Controllers
                 var success = await _ticketService.UpdateAsync(ticket);
                 if (!success)
                 {
-                    return NotFound(new { message = "Ticket not found" });
+                    return NotFound(ApiResponse<object>.ErrorResult("Ticket not found"));
                 }
-                return Ok(new { message = "Ticket updated successfully" });
+                return Ok(ApiResponse<object>.SuccessResult(new { }, "Ticket updated successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
 
@@ -147,13 +154,13 @@ namespace TicketManagementSystem.Server.Controllers
                 var success = await _ticketService.DeleteAsync(id);
                 if (!success)
                 {
-                    return NotFound(new { message = "Ticket not found" });
+                    return NotFound(ApiResponse<object>.ErrorResult("Ticket not found"));
                 }
-                return Ok(new { message = "Ticket deleted successfully" });
+                return Ok(ApiResponse<object>.SuccessResult(new { }, "Ticket deleted successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
     }

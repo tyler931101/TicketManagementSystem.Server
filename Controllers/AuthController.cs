@@ -21,7 +21,7 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] DTOs.Auth.LoginRequest request)
+        public async Task<IActionResult> Login([FromBody] DTOs.Auth.LoginRequest request)
         {
             try
             {
@@ -30,7 +30,7 @@ namespace TicketManagementSystem.Server.Controllers
                     return BadRequest(ApiResponse<object>.ErrorResult("Invalid request data"));
                 }
 
-                var user = _authService.LoginAsync(request.Email, request.Password);
+                var (user, token) = await _authService.LoginAsync(request.Email, request.Password);
 
                 if (user == null)
                 {
@@ -57,8 +57,8 @@ namespace TicketManagementSystem.Server.Controllers
                 var authResponse = new DTOs.Auth.AuthResponse
                 {
                     User = userDto,
-                    Token = "", // TODO: Implement JWT token generation
-                    ExpiresAt = DateTime.Now.AddHours(24)
+                    Token = token ?? string.Empty,
+                    ExpiresAt = DateTime.UtcNow.AddDays(7)
                 };
 
                 return Ok(ApiResponse<DTOs.Auth.AuthResponse>.SuccessResult(authResponse, "Login successful"));
@@ -70,7 +70,7 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPost("register")]
-        public IActionResult Register([FromBody] DTOs.Auth.RegisterRequest request)
+        public async Task<IActionResult> Register([FromBody] DTOs.Auth.RegisterRequest request)
         {
             try
             {
@@ -79,7 +79,7 @@ namespace TicketManagementSystem.Server.Controllers
                     return BadRequest(ApiResponse<object>.ErrorResult("Invalid request data"));
                 }
 
-                var success = _authService.RegisterAsync(request.Username, request.Password, request.Email);
+                var success = await _authService.RegisterAsync(request.Username, request.Password, request.Email);
                 if (!success)
                 {
                     return BadRequest(ApiResponse<object>.ErrorResult("Registration failed - username or email already exists"));

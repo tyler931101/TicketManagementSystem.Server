@@ -47,6 +47,10 @@ namespace TicketManagementSystem.Server.Services
             if (existing == null)
                 return false;
 
+            // Preserve immutable properties
+            ticket.CreatedAt = existing.CreatedAt;
+            ticket.UpdatedAt = DateTime.Now;
+
             _db.Entry(existing).CurrentValues.SetValues(ticket);
             await _db.SaveChangesAsync();
             return true;

@@ -1,5 +1,14 @@
+/* 
+PSEUDOCODE / PLAN:
+1. Identify cause: 'AsNoTracking' is an EF Core extension method defined in the Microsoft.EntityFrameworkCore namespace.
+2. Fix: add the missing using directive 'using Microsoft.EntityFrameworkCore;' at the top of the file so the extension method is available.
+3. Keep existing logic unchanged; no signature or behavior modifications required.
+4. Provide the updated file content with the new using added and include this pseudocode as a comment for documentation.
+*/
+
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
 using TicketManagementSystem.Server.DTOs.Common;
@@ -15,14 +24,14 @@ namespace TicketManagementSystem.Server.Services
             _db = db;
         }
 
-        public IEnumerable<User> GetTicketUsersAsync()
+        public async Task<IEnumerable<User>> GetTicketUsersAsync()
         {
-            return _db.Users
+            return await _db.Users
                      .OrderBy(u => u.Username)
-                     .ToList();
+                     .ToListAsync();
         }
 
-        public PagedResponseDto<User> GetAllUsersAsync(PagedRequestDto request)
+        public async Task<PagedResponseDto<User>> GetAllUsersAsync(PagedRequestDto request)
         {
             // Validate request parameters
             if (request.PageNumber < 1) request.PageNumber = 1;
@@ -36,14 +45,16 @@ namespace TicketManagementSystem.Server.Services
                 var searchTerm = request.SearchTerm.Trim().ToLower();
                 query = query.Where(u => 
                     u.Username.ToLower().Contains(searchTerm) ||
-                    u.Email.ToLower().Contains(searchTerm));
+                    u.Email.ToLower().Contains(searchTerm) ||
+                    u.PhoneNumber.ToLower().Contains(searchTerm) ||
+                    u.Address.ToLower().Contains(searchTerm));
             }
 
             // Optimized count query - only execute when needed
-            var totalRecords = query.Count();
+            var totalRecords = await query.CountAsync();
 
             // Apply pagination with optimized ordering
-            var users = query
+            var users = await query
                 .OrderBy(u => u.Username)  // Consider adding index on Username
                 .ThenBy(u => u.Id)       // Secondary sort for consistent results
                 .Skip((request.PageNumber - 1) * request.PageSize)
@@ -53,11 +64,12 @@ namespace TicketManagementSystem.Server.Services
                     Id = u.Id,
                     Username = u.Username,
                     Email = u.Email,
+                    PhoneNumber = u.PhoneNumber,
+                    Address = u.Address,
                     Role = u.Role,
                     IsLoginAllowed = u.IsLoginAllowed
-                })
-                .AsNoTracking()  // Read-only query optimization
-                .ToList();
+                }).AsNoTracking()  // Read-only query optimization
+                .ToListAsync();
 
             var totalPages = (int)Math.Ceiling((double)totalRecords / request.PageSize);
 
@@ -73,13 +85,13 @@ namespace TicketManagementSystem.Server.Services
             };
         }
 
-        public void SetLoginAllowed(User user, bool isAllowed)
+        public async Task SetLoginAllowedAsync(User user, bool isAllowed)
         {
-            var existingUser = _db.Users.FirstOrDefault(u => u.Id == user.Id);
+            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Id == user.Id);
             if (existingUser != null)
             {
                 existingUser.IsLoginAllowed = isAllowed;
-                _db.SaveChanges();
+                await _db.SaveChangesAsync();
             }
         }
     }

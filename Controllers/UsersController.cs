@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
@@ -7,6 +8,7 @@ using TicketManagementSystem.Server.DTOs.Common;
 
 namespace TicketManagementSystem.Server.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class UsersController : ControllerBase
@@ -20,7 +22,7 @@ namespace TicketManagementSystem.Server.Controllers
 
         [HttpGet]
         [ResponseCache(Duration = 30)] // Cache for 30 seconds
-        public IActionResult GetAllUsers([FromQuery] PagedRequestDto request)
+        public async Task<IActionResult> GetAllUsers([FromQuery] PagedRequestDto request)
         {
             try
             {
@@ -32,12 +34,12 @@ namespace TicketManagementSystem.Server.Controllers
                 }
 
                 var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                var result = _userService.GetAllUsersAsync(request);
+                var result = await _userService.GetAllUsersAsync(request);
                 stopwatch.Stop();
 
                 // Add performance metadata
-                Response.Headers.Add("X-Response-Time", stopwatch.ElapsedMilliseconds.ToString());
-                Response.Headers.Add("X-Total-Records", result.TotalRecords.ToString());
+                Response.Headers.Append("X-Response-Time", stopwatch.ElapsedMilliseconds.ToString());
+                Response.Headers.Append("X-Total-Records", result.TotalRecords.ToString());
 
                 return Ok(ApiResponse<PagedResponseDto<User>>.SuccessResult(result, "Users retrieved successfully"));
             }
@@ -56,11 +58,11 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpGet("ticket-users")]
-        public IActionResult GetTicketUsers()
+        public async Task<IActionResult> GetTicketUsers()
         {
             try
             {
-                var users = _userService.GetTicketUsersAsync();
+                var users = await _userService.GetTicketUsersAsync();
                 
                 if (users == null)
                 {
@@ -88,17 +90,17 @@ namespace TicketManagementSystem.Server.Controllers
         }
 
         [HttpPost("{id}/toggle-login")]
-        public IActionResult ToggleLogin(Guid id, [FromBody] ToggleLoginRequest request)
+        public async Task<IActionResult> ToggleLogin(Guid id, [FromBody] ToggleLoginRequest request)
         {
             try
             {
                 var user = new User { Id = id };
-                _userService.SetLoginAllowed(user, request.IsAllowed);
-                return Ok(new { message = "Login permission updated successfully" });
+                await _userService.SetLoginAllowedAsync(user, request.IsAllowed);
+                return Ok(ApiResponse<object>.SuccessResult(new { }, "Login permission updated successfully"));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Server error", error = ex.Message });
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
     }

@@ -22,6 +22,13 @@ namespace TicketManagementSystem.Server.Models
         [StringLength(100)]
         public string Email { get; set; } = string.Empty;
 
+
+        [StringLength(100)]
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        [StringLength(20)]
+        public string Address { get; set; } = string.Empty;
+
         [Required]
         [StringLength(20)]
         public string Role { get; set; } = "User";
