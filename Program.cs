@@ -9,6 +9,7 @@ using System.Text;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.DTOs.Common;
 using TicketManagementSystem.Server.Services;
+using TicketManagementSystem.Server.Services.Sync;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<TicketService>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<ISyncPublisher, HttpSyncPublisher>();
 
 // JWT Authentication
 var key = Encoding.ASCII.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is missing"));

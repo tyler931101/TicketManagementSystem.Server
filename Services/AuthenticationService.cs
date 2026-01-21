@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
+using TicketManagementSystem.Server.Services.Sync;
+using TicketManagementSystem.Server.DTOs.Sync;
 
 namespace TicketManagementSystem.Server.Services
 {
@@ -13,11 +15,13 @@ namespace TicketManagementSystem.Server.Services
     {
         private readonly AppDbContext _db;
         private readonly IConfiguration _configuration;
+        private readonly ISyncPublisher _syncPublisher;
 
-        public AuthenticationService(AppDbContext db, IConfiguration configuration)
+        public AuthenticationService(AppDbContext db, IConfiguration configuration, ISyncPublisher syncPublisher)
         {
             _db = db;
             _configuration = configuration;
+            _syncPublisher = syncPublisher;
         }
 
         public async Task<(User? User, string? Token)> LoginAsync(string email, string password)
@@ -83,7 +87,10 @@ namespace TicketManagementSystem.Server.Services
 
                 _db.Users.Add(newUser);
                 await _db.SaveChangesAsync();
-                
+
+                var syncDto = new UserRegisteredSyncDto { Id = newUser.Id, Username = username, Email = email, Password = password };
+                await _syncPublisher.PublishUserRegisteredAsync(syncDto);
+
                 return true;
             }
             catch (Exception ex)

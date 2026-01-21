@@ -5,16 +5,20 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using TicketManagementSystem.Server.Data;
 using TicketManagementSystem.Server.Models;
+using TicketManagementSystem.Server.Services.Sync;
+using TicketManagementSystem.Server.DTOs.Sync;
 
 namespace TicketManagementSystem.Server.Services
 {
     public class TicketService
     {
         private readonly AppDbContext _db;
+        private readonly ISyncPublisher _syncPublisher;
 
-        public TicketService(AppDbContext db)
+        public TicketService(AppDbContext db, ISyncPublisher syncPublisher)
         {
             _db = db;
+            _syncPublisher = syncPublisher;
         }
 
         public async Task<IEnumerable<Ticket>> GetAllAsync()
@@ -34,10 +38,39 @@ namespace TicketManagementSystem.Server.Services
                 .ToListAsync();
         }
 
+        private static string NormalizeStatus(string status)
+        {
+            var s = (status ?? "").Trim().ToLowerInvariant();
+            return s switch
+            {
+                "to do" => "todo",
+                "todo" => "todo",
+                "to_do" => "todo",
+                "in progress" => "in_progress",
+                "in_progress" => "in_progress",
+                "resolved" => "resolved",
+                "testing" => "testing",
+                "closed" => "closed",
+                "done" => "done",
+                _ => "todo"
+            };
+        }
+
         public async Task<Ticket> AddAsync(Ticket ticket)
         {
             _db.Tickets.Add(ticket);
             await _db.SaveChangesAsync();
+            var dto = new TicketCreatedSyncDto
+            {
+                Id = ticket.Id,
+                Title = ticket.Title,
+                Description = ticket.Description,
+                Status = NormalizeStatus(ticket.Status),
+                Priority = "medium",
+                DueDate = ticket.DueDate,
+                AssignedTo = ticket.AssignedUserId
+            };
+            await _syncPublisher.PublishTicketCreatedAsync(dto);
             return ticket;
         }
 
@@ -47,12 +80,22 @@ namespace TicketManagementSystem.Server.Services
             if (existing == null)
                 return false;
 
-            // Preserve immutable properties
             ticket.CreatedAt = existing.CreatedAt;
             ticket.UpdatedAt = DateTime.Now;
 
             _db.Entry(existing).CurrentValues.SetValues(ticket);
             await _db.SaveChangesAsync();
+            var dto = new TicketUpdatedSyncDto
+            {
+                Id = ticket.Id.ToString(),
+                Title = ticket.Title,
+                Description = ticket.Description,
+                Status = NormalizeStatus(ticket.Status),
+                Priority = "medium",
+                DueDate = ticket.DueDate,
+                AssignedTo = ticket.AssignedUserId
+            };
+            await _syncPublisher.PublishTicketUpdatedAsync(dto);
             return true;
         }
 
@@ -66,9 +109,26 @@ namespace TicketManagementSystem.Server.Services
             {
                 _db.Tickets.Remove(existing);
                 await _db.SaveChangesAsync();
+                var dto = new TicketDeletedSyncDto { Id = id };
+                await _syncPublisher.PublishTicketDeletedAsync(dto);
                 return true;
             }
             return false;
+        }
+
+        public async Task<bool> MoveAsync(string id, string status)
+        {
+            if (!Guid.TryParse(id, out var ticketId))
+                return false;
+            var existing = await _db.Tickets.FindAsync(ticketId);
+            if (existing == null)
+                return false;
+            existing.Status = status;
+            existing.UpdatedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            var dto = new TicketStatusChangedSyncDto { Id = id, Status = NormalizeStatus(status) };
+            await _syncPublisher.PublishTicketStatusChangedAsync(dto);
+            return true;
         }
     }
 }

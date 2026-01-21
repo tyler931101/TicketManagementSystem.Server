@@ -163,6 +163,28 @@ namespace TicketManagementSystem.Server.Controllers
                 return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
             }
         }
+
+        [HttpPatch("{id}/move")]
+        public async Task<IActionResult> Move(string id, [FromBody] MoveTicketRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.Status))
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResult("Status is required"));
+                }
+                var success = await _ticketService.MoveAsync(id, request.Status);
+                if (!success)
+                {
+                    return NotFound(ApiResponse<object>.ErrorResult("Ticket not found"));
+                }
+                return Ok(ApiResponse<object>.SuccessResult(new { }, "Ticket moved successfully"));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Server error", new List<string> { ex.Message }));
+            }
+        }
     }
 
     public class CreateTicketRequest
@@ -181,5 +203,10 @@ namespace TicketManagementSystem.Server.Controllers
         public string Status { get; set; } = string.Empty;
         public DateTime DueDate { get; set; }
         public Guid? AssignedUserId { get; set; }
+    }
+
+    public class MoveTicketRequest
+    {
+        public string Status { get; set; } = string.Empty;
     }
 }
