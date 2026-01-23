@@ -9,5 +9,6 @@ namespace TicketManagementSystem.Server.Services.Sync
         Task PublishTicketUpdatedAsync(TicketUpdatedSyncDto dto);
         Task PublishTicketDeletedAsync(TicketDeletedSyncDto dto);
         Task PublishTicketStatusChangedAsync(TicketStatusChangedSyncDto dto);
+        Task PublishUserAvatarUpdatedAsync(Guid userId, byte[] data, string mimeType);
     }
 }

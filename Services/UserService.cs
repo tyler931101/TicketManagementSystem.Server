@@ -18,10 +18,12 @@ namespace TicketManagementSystem.Server.Services
     public class UserService
     {
         private readonly AppDbContext _db;
+        private readonly Sync.ISyncPublisher _syncPublisher;
 
-        public UserService(AppDbContext db)
+        public UserService(AppDbContext db, Sync.ISyncPublisher syncPublisher)
         {
             _db = db;
+            _syncPublisher = syncPublisher;
         }
 
         public async Task<IEnumerable<User>> GetTicketUsersAsync()
@@ -93,6 +95,99 @@ namespace TicketManagementSystem.Server.Services
                 existingUser.IsLoginAllowed = isAllowed;
                 await _db.SaveChangesAsync();
             }
+        }
+
+        public async Task<User?> GetByIdAsync(Guid id)
+        {
+            return await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+        }
+
+        public async Task<bool> UpdateUserAsync(Guid id, DTOs.Users.UpdateUserDto dto)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null) return false;
+
+            if (!string.IsNullOrWhiteSpace(dto.Username))
+            {
+                var exists = await _db.Users.AnyAsync(u => u.Id != id && u.Username == dto.Username);
+                if (exists) throw new ArgumentException("Username already exists");
+                user.Username = dto.Username.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Email))
+            {
+                var exists = await _db.Users.AnyAsync(u => u.Id != id && u.Email == dto.Email);
+                if (exists) throw new ArgumentException("Email already exists");
+                user.Email = dto.Email.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.PhoneNumber))
+            {
+                user.PhoneNumber = dto.PhoneNumber.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.Address))
+            {
+                user.Address = dto.Address.Trim();
+            }
+
+            user.UpdatedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> ChangePasswordAsync(Guid id, DTOs.Users.ChangePasswordDto dto)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null) return false;
+
+            bool isValidCurrent;
+            if (user.Password.Length < 60)
+            {
+                isValidCurrent = user.Password == dto.CurrentPassword;
+            }
+            else
+            {
+                isValidCurrent = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.Password);
+            }
+
+            if (!isValidCurrent) throw new ArgumentException("Current password is incorrect");
+
+            user.Password = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            user.UpdatedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> SetAvatarAsync(Guid id, byte[] data, string mimeType)
+        {
+            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if (user == null) return false;
+            user.AvatarData = data;
+            user.AvatarMimeType = mimeType;
+            user.AvatarPath = null;
+            user.AvatarUpdatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.Now;
+            await _db.SaveChangesAsync();
+            try
+            {
+                await _syncPublisher.PublishUserAvatarUpdatedAsync(id, data, mimeType);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Avatar sync error: {ex.Message}");
+            }
+            return true;
+        }
+
+        public async Task<(byte[] data, string mimeType)?> GetAvatarAsync(Guid id)
+        {
+            var user = await _db.Users
+                .Where(u => u.Id == id)
+                .Select(u => new { u.AvatarData, u.AvatarMimeType })
+                .FirstOrDefaultAsync();
+            if (user == null || user.AvatarData == null || string.IsNullOrEmpty(user.AvatarMimeType)) return null;
+            return (user.AvatarData, user.AvatarMimeType);
         }
     }
 }

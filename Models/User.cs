@@ -22,7 +22,6 @@ namespace TicketManagementSystem.Server.Models
         [StringLength(100)]
         public string Email { get; set; } = string.Empty;
 
-
         [StringLength(100)]
         public string PhoneNumber { get; set; } = string.Empty;
 
@@ -35,6 +34,13 @@ namespace TicketManagementSystem.Server.Models
 
         [StringLength(255)]
         public string? AvatarPath { get; set; }
+        
+        public byte[]? AvatarData { get; set; }
+        
+        [StringLength(50)]
+        public string? AvatarMimeType { get; set; }
+        
+        public DateTime? AvatarUpdatedAt { get; set; }
         
         public bool IsLoginAllowed { get; set; } = true;
         
